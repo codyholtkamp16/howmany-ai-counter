@@ -145,7 +145,10 @@ def call_claude_vision(
         )
 
         raw = response.content[0].text.strip()
-
+        print("=== RAW CLAUDE RESPONSE ===")
+        print(raw)
+        print("===========================")
+        
         # Strip potential markdown fences
         if raw.startswith("```"):
             raw = raw.split("```")[1]
