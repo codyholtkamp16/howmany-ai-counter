@@ -97,7 +97,7 @@ ITEM TO COUNT: {item_description}
 
 Instructions:
 1. Carefully examine the entire drawing, including legends, callouts, and plan views.
-2. Count EVERY occurrence — both in the main drawing and in any detail views or legends.
+2. Count EVERY occurrence — only in the main drawing and in any detail views but do not include keys or legends--as these are not part of the actual site furnishing.
 3. If the same item appears in a legend/key, do NOT count the legend entry itself — only count real placements.
 4. Provide your reasoning step-by-step, then give a final definitive count.
 
@@ -148,7 +148,7 @@ def call_claude_vision(
         print("=== RAW CLAUDE RESPONSE ===")
         print(raw)
         print("===========================")
-        
+
         # Strip potential markdown fences
         if raw.startswith("```"):
             raw = raw.split("```")[1]
