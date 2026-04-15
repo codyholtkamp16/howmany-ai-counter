@@ -1,6 +1,6 @@
 """
 Schematic Item Counter — Flask Backend
-Converts uploaded PDF pages to images and sends them to the Anthropic Vision API
+Converts uploaded PDF pages to images and sends them to the openAI GPT Vision API
 for intelligent item counting on site furnishing schematics/drawings.
 
 Requirements:
@@ -239,5 +239,5 @@ if __name__ == "__main__":
     debug = os.environ.get("DEBUG", "1") == "1"
     print(f"Starting Schematic Counter server on ")
     if not API_KEY:
-        print("  ⚠  WARNING: ANTHROPIC_API_KEY is not set!")
+        print("  ⚠  WARNING: API_KEY is not set!")
     app.run(host="0.0.0.0", port=port, debug=debug)
