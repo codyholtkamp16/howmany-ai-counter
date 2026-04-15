@@ -4,10 +4,10 @@ Converts uploaded PDF pages to images and sends them to the Anthropic Vision API
 for intelligent item counting on site furnishing schematics/drawings.
 
 Requirements:
-    pip install flask flask-cors anthropic pdf2image pillow pypdf
+    pip install flask flask-cors pdf2image pillow pypdf
 
 Usage:
-    ANTHROPIC_API_KEY=sk-... python server.py
+    API_KEY=sk-... python server.py
 """
 
 import base64
@@ -16,10 +16,11 @@ import os
 import json
 import tempfile
 import traceback
+import base64
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import anthropic
+from openai import OpenAI
 from PIL import Image
 
 try:
@@ -38,10 +39,11 @@ except ImportError:
 app = Flask(__name__)
 CORS(app)  # Allow requests from the frontend
 
-# ── Anthropic client ──────────────────────────────────────────────────────────
-API_KEY = "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"
-client = anthropic.Anthropic(api_key=API_KEY) if API_KEY else None
+# ── OpenAI client ──────────────────────────────────────────────────────────
+API_KEY = os.environ.get("OPENAI_API_KEY", "")
+MODEL   = "gpt-4o"
 
+client = OpenAI(api_key=API_KEY) if API_KEY else None
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -116,7 +118,7 @@ def call_claude_vision(
 ) -> dict:
     """Send all page images to Claude and aggregate counts."""
     if client is None:
-        raise RuntimeError("ANTHROPIC_API_KEY is not set.")
+        raise RuntimeError("API_KEY is not set.")
 
     page_results = []
     total_count = 0
@@ -124,28 +126,26 @@ def call_claude_vision(
     for i, (b64, media_type) in enumerate(b64_images, start=1):
         prompt = build_counting_prompt(item_description, i, len(b64_images))
 
-        response = client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=1024,
-            messages=[
+        response = client.chat.completions.create(
+        model=MODEL,
+        max_tokens=4096,
+        temperature = 0
+        messages=[{
+            "role": "user",
+            "content": [
                 {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": media_type,
-                                "data": b64,
-                            },
-                        },
-                        {"type": "text", "text": prompt},
-                    ],
-                }
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:{media_type};base64,{b64}",
+                        "detail": "high",
+                    },
+                },
+                {"type": "text", "text": prompt},
             ],
-        )
+        }],
+    )
 
-        raw = response.content[0].text.strip()
+        raw = response.choices[0].message.content.strip()
         print("=== RAW CLAUDE RESPONSE ===")
         print(raw)
         print("===========================")
@@ -237,7 +237,7 @@ def count_items():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5050))
     debug = os.environ.get("DEBUG", "1") == "1"
-    print(f"Starting Schematic Counter server on http://localhost:{port}")
+    print(f"Starting Schematic Counter server on ")
     if not API_KEY:
         print("  ⚠  WARNING: ANTHROPIC_API_KEY is not set!")
     app.run(host="0.0.0.0", port=port, debug=debug)
