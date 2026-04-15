@@ -129,7 +129,7 @@ def call_claude_vision(
         response = client.chat.completions.create(
         model=MODEL,
         max_tokens=4096,
-        temperature = 0
+        temperature = 0,
         messages=[{
             "role": "user",
             "content": [
