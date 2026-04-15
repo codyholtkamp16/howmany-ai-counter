@@ -18,6 +18,7 @@ import tempfile
 import traceback
 import base64
 
+from flask import send_file
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from openai import OpenAI
