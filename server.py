@@ -99,7 +99,8 @@ I need you to count every instance of the following item in this schematic drawi
 ITEM TO COUNT: {item_description}
 
 Instructions:
-1. Carefully examine the entire schematic, including legends, callouts, and plan views.
+1. Carefully examine the entire schematic and other linked pages
+2. This will include legends, other color codes, and plan views.
 2. Count every occurrence — only in the main drawing and in any detail views but do not include keys or legends--as these are not part of the actual site furnishing.
 3. If the same item appears in a legend/key, do NOT count the legend entry itself — only count real placements.
 4. Give a final definitive count.
@@ -180,7 +181,9 @@ def call_claude_vision(
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
-
+@app.route("/")
+def index():
+    return send_file("index.html")
 @app.route("/health", methods=["GET"])
 def health():
     return jsonify({
@@ -241,4 +244,4 @@ if __name__ == "__main__":
     print(f"Starting Schematic Counter server on ")
     if not API_KEY:
         print("  ⚠  WARNING: API_KEY is not set!")
-    app.run(host="0.0.0.0", port=port, debug=debug)
+    app.run(host="0.0.0.0", port=port, debug=debug, use_reloader=False)
