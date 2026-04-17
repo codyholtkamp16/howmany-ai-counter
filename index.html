@@ -411,7 +411,7 @@
   <div class="card">
     <div class="card-label">01 — Upload PDF</div>
     <div class="dropzone" id="dropzone">
-      <input type="file" id="file-input" accept=".pdf" />
+      <input type="file" id="file-input" accept=".pdf" multiple/>
       <div class="dz-icon">
         <svg fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
           <path d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
@@ -526,7 +526,7 @@
   const pageResults = document.getElementById('page-results');
   const resetBtn    = document.getElementById('reset-btn');
 
-  let selectedFile = null;
+  let selectedFiles = [];
 
   function formatBytes(b) {
     if (b < 1024) return b + ' B';
@@ -534,16 +534,33 @@
     return (b / (1024 * 1024)).toFixed(1) + ' MB';
   }
 
-  function setFile(file) {
-    if (!file || !file.name.toLowerCase().endsWith('.pdf')) {
-      showError('Please select a PDF file.');
+  function addFiles(newFiles) {
+    const pdfs = Array.from(newFiles).filter(f => f.name.toLowerCase().endsWith('.pdf'));
+    if (pdfs.length === 0) { showError('Please select PDF files only.'); return; }
+    selectedFiles = [...selectedFiles, ...pdfs];
+    renderFileList();
+    hideError();
+  }
+
+  function renderFileList() {
+    if (selectedFiles.length === 0) {
+      filePreview.classList.remove('visible');
       return;
     }
-    selectedFile = file;
-    fileName.textContent = file.name;
-    fileMeta.textContent = formatBytes(file.size);
     filePreview.classList.add('visible');
-    hideError();
+    fileNameEl.innerHTML = selectedFiles.map((f, i) =>
+      `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        <span>${f.name}</span>
+        <button onclick="removeFile(${i})" style="background:none;border:none;cursor:pointer;color:var(--accent-mid);font-size:12px;">✕</button>
+      </div>`
+    ).join('');
+    const totalSize = selectedFiles.reduce((sum, f) => sum + f.size, 0);
+    fileMetaEl.textContent = `${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''} — ${formatBytes(totalSize)}`;
+  }
+
+  window.removeFile = function(index) {
+    selectedFiles.splice(index, 1);
+    renderFileList();
   }
 
   fileInput.addEventListener('change', e => setFile(e.target.files[0]));
@@ -592,7 +609,7 @@
   submitBtn.addEventListener('click', async () => {
     hideError();
 
-    if (!selectedFile) { showError('Please upload a PDF file first.'); return; }
+    if (selectedFiles.length === 0) { showError('Please upload at least one PDF file.'); return; }
     if (!itemInput.value.trim()) { showError('Please describe what to count.'); return; }
 
     const url = serverUrl.value.trim().replace(/\/$/, '');
@@ -601,7 +618,7 @@
     results.style.display = 'none';
 
     const fd = new FormData();
-    fd.append('file', selectedFile);
+    selectedFiles.forEach(f => fd.append('files[]', f));
     fd.append('item', itemInput.value.trim());
     fd.append('dpi', dpiSelect.value);
 
@@ -653,7 +670,7 @@
   }
 
   resetBtn.addEventListener('click', () => {
-    selectedFile = null;
+    selectedFiles = []; annotatedB64 = null;
     fileInput.value = '';
     filePreview.classList.remove('visible');
     itemInput.value = '';

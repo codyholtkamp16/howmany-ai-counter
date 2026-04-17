@@ -202,24 +202,24 @@ def count_items():
       - item: string description of the item to count
       - dpi: (optional) render DPI, default 150
     """
-    if "file" not in request.files:
+    ## --------------
+    if "files[]" not in request.files:
         return jsonify({"error": "No file uploaded."}), 400
     if "item" not in request.form or not request.form["item"].strip():
         return jsonify({"error": "No item description provided."}), 400
 
-    pdf_file = request.files["file"]
+    pdf_files = request.files.getlist("files[]")
     item_description = request.form["item"].strip()
     dpi = int(request.form.get("dpi", 150))
 
-    if not pdf_file.filename.lower().endswith(".pdf"):
-        return jsonify({"error": "Uploaded file must be a PDF."}), 400
-
     try:
-        pdf_bytes = pdf_file.read()
-
-        # Render PDF pages to images
-        images = pdf_bytes_to_images(pdf_bytes, dpi=dpi)
-
+        images = []
+        for pdf_file in pdf_files:
+            if not pdf_file.filename.lower().endswith(".pdf"):
+                return jsonify({"error": f"{pdf_file.filename} is not a PDF."}), 400
+            pdf_bytes = pdf_file.read()
+            images.extend(pdf_bytes_to_images(pdf_bytes, dpi=dpi))
+            
         if not images:
             return jsonify({"error": "Could not render any pages from the PDF."}), 422
 
