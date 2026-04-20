@@ -511,8 +511,8 @@
   const fileInput   = document.getElementById('file-input');
   const dropzone    = document.getElementById('dropzone');
   const filePreview = document.getElementById('file-preview');
-  const fileName    = document.getElementById('file-name');
-  const fileMeta    = document.getElementById('file-meta');
+  const fileNameEl  = document.getElementById('file-name');
+  const fileMetaEl  = document.getElementById('file-meta');
   const removeBtn   = document.getElementById('remove-btn');
   const itemInput   = document.getElementById('item-input');
   const dpiSelect   = document.getElementById('dpi-select');
@@ -563,7 +563,7 @@
     renderFileList();
   }
 
-  fileInput.addEventListener('change', e => setFile(e.target.files[0]));
+  fileInput.addEventListener('change', e => addFiles(e.target.files));
 
   dropzone.addEventListener('dragover', e => {
     e.preventDefault(); dropzone.classList.add('drag-over');
@@ -571,11 +571,11 @@
   dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
   dropzone.addEventListener('drop', e => {
     e.preventDefault(); dropzone.classList.remove('drag-over');
-    setFile(e.dataTransfer.files[0]);
+    addFiles(e.dataTransfer.files);
   });
 
   removeBtn.addEventListener('click', () => {
-    selectedFile = null;
+    selectedFiles = [];
     fileInput.value = '';
     filePreview.classList.remove('visible');
   });
@@ -608,12 +608,10 @@
 
   submitBtn.addEventListener('click', async () => {
     hideError();
-
     if (selectedFiles.length === 0) { showError('Please upload at least one PDF file.'); return; }
     if (!itemInput.value.trim()) { showError('Please describe what to count.'); return; }
 
     const url = serverUrl.value.trim().replace(/\/$/, '');
-
     setLoading(true);
     results.style.display = 'none';
 
@@ -625,12 +623,7 @@
     try {
       const resp = await fetch(`${url}/count`, { method: 'POST', body: fd });
       const data = await resp.json();
-
-      if (!resp.ok) {
-        showError(data.error || `Server error ${resp.status}`);
-        return;
-      }
-
+      if (!resp.ok) { showError(data.error || `Server error ${resp.status}`); return; }
       renderResults(data);
     } catch (err) {
       showError(`Could not reach server at ${url}. Is it running?`);
@@ -670,7 +663,7 @@
   }
 
   resetBtn.addEventListener('click', () => {
-    selectedFiles = []; annotatedB64 = null;
+    selectedFiles = [];
     fileInput.value = '';
     filePreview.classList.remove('visible');
     itemInput.value = '';
@@ -679,5 +672,3 @@
     window.scrollTo({ top: 0, behavior: 'smooth' });
   });
 </script>
-</body>
-</html>
