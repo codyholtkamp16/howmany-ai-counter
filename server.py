@@ -173,7 +173,9 @@ The image is {img_w} x {img_h} pixels.
 Instructions:
 - Look for the text label "{item_code}" placed as a callout or tag anywhere in the drawing.
 - Do NOT count entries inside the legend/key box itself — only placements in the actual drawing area.
-- For each instance found, provide its CENTER coordinate in pixels (x from left, y from top).
+- For each instance found, provide the EXACT CENTER coordinate in pixels (x from left, y from top).
+- The coordinate should point precisely to the CENTER of the text label itself, not nearby.
+- Be as precise as possible — coordinates will be used to draw a small circle directly on top of the label.
 - Classify as "confirmed" (certain) or "maybe" (ambiguous or partially visible).
 
 Respond ONLY with this exact JSON and nothing else:
@@ -239,9 +241,9 @@ def annotate_pdf_for_item(schematic_images: list[Image.Image],
     maybe_stroke     = Color(0.9,  0.45, 0.05, alpha=0.9)
     maybe_text       = Color(0.7,  0.3,  0.0,  alpha=1.0)
 
-    circle_r  = 10
-    box_pad   =  9
-    font_size =  6
+    circle_r  = 5
+    box_pad   =  5
+    font_size =  5
 
     writer = PdfWriter()
 
