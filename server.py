@@ -48,8 +48,8 @@ API_KEY = os.environ.get("OPENAI_API_KEY", "")
 MODEL   = "gpt-4o"
 
 # Grid dimensions — 2x2 = 4 tiles per page
-TILE_COLS = 2
-TILE_ROWS = 2
+TILE_COLS = 3
+TILE_ROWS = 3
 
 client = OpenAI(api_key=API_KEY) if API_KEY else None
 
