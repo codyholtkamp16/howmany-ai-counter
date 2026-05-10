@@ -438,7 +438,7 @@ def count_items():
     if "files[]" not in request.files:
         return jsonify({"error": "No schematic PDFs uploaded."}), 400
 
-    dpi = int(request.form.get("dpi", 150))
+    dpi = int(request.form.get("dpi", 200))
 
     try:
         # ── Render legend ──────────────────────────────────────────────────
