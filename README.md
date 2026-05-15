@@ -1,42 +1,83 @@
 # Schematic Item Counter
 
-AI-powered tool that counts items (trees, benches, bollards, etc.) in site-furnishing
-schematics/blueprints by sending rendered PDF pages to the Claude Vision API.
+AI-powered tool that reads a legend/key PDF, extracts every listed symbol code,
+then counts those items across one or more schematic PDFs. The backend renders PDF
+pages to images, scans each schematic page in tiles with OpenAI vision, and returns
+per-item totals plus annotated PDFs.
 
 ---
 
 ## Project Structure
 
-```
-schematic-counter/
-├── server.py     — Flask backend (PDF → image → Claude Vision → count)
-├── index.html    — Frontend (drag-and-drop upload, results display)
+```text
+howmany/
+├── Dockerfile       - Recipe for building the app into a Docker image
+├── compose.yaml     - Repeatable local/EC2 container run settings
+├── requirements.txt - Python dependency list installed inside Docker
+├── server.py        - Flask backend: PDF rendering, legend parsing, tiled counting, annotation
+├── index.html       - Frontend: legend upload, schematic upload, results table
 └── README.md
 ```
 
 ---
 
-## Setup
+## Docker Mental Model
+
+Your current deploy path is:
+
+```text
+local files -> GitHub repository -> EC2 pulls repository -> EC2 installs/runs app
+```
+
+Docker changes the repeatability part:
+
+```text
+project files + Dockerfile -> Docker image -> Docker container running on EC2
+```
+
+The terms matter:
+
+- **Dockerfile**: the recipe. It says which Python version to use, which Linux
+  packages to install, which Python packages to install, which files to copy, and
+  which command starts the app.
+- **Image**: the built artifact from that recipe. It is like a frozen snapshot of
+  the app plus its runtime dependencies.
+- **Container**: a running instance of the image. If the image is the blueprint,
+  the container is the live process.
+- **Port mapping**: Docker keeps the app inside a private container network, so
+  `5050:5050` means "send traffic from EC2/local port 5050 into container port
+  5050."
+- **Environment variables**: runtime settings such as `OPENAI_API_KEY`. These
+  should be passed into the container when it runs, not baked into the image.
+
+You can still use GitHub with Docker, but EC2 no longer needs to understand your
+Python setup manually. It just needs Docker, the project files, and the command
+to build/run the image. Later, you can push built images to a registry instead of
+copying source files to EC2.
+
+---
+
+## Setup Without Docker
 
 ### 1. Install dependencies
 
 ```bash
-pip install flask flask-cors anthropic pdf2image pillow pypdf
+pip install flask flask-cors openai pdf2image pillow pypdf reportlab
 
-# On Ubuntu/Debian — needed by pdf2image:
+# On Ubuntu/Debian, needed by pdf2image:
 sudo apt-get install poppler-utils
 
 # On macOS:
 brew install poppler
 
-# Alternatively, install pypdfium2 as a zero-system-dep renderer:
+# Optional zero-system-dependency PDF renderer fallback:
 pip install pypdfium2
 ```
 
 ### 2. Set your API key
 
 ```bash
-export ANTHROPIC_API_KEY="sk-ant-..."
+export OPENAI_API_KEY="sk-..."
 ```
 
 ### 3. Start the server
@@ -46,26 +87,103 @@ python server.py
 # Listening on http://localhost:5050
 ```
 
+---
+
+## Setup With Docker
+
+### 1. Build the image
+
+```bash
+docker build -t howmany .
+```
+
+What this does:
+
+- Reads `Dockerfile`.
+- Starts from `python:3.11-slim`.
+- Installs Poppler so `pdf2image` can render PDFs.
+- Installs Python dependencies from `requirements.txt`.
+- Copies `server.py` and `index.html` into the image.
+- Produces an image named `howmany`.
+
+### 2. Run the container
+
+```bash
+docker run --rm \
+  --name howmany \
+  -p 5050:5050 \
+  -e OPENAI_API_KEY="$OPENAI_API_KEY" \
+  howmany
+```
+
+What this does:
+
+- `--rm` removes the container after it stops.
+- `--name howmany` gives the running container a friendly name.
+- `-p 5050:5050` exposes the Flask app to `http://localhost:5050`.
+- `-e OPENAI_API_KEY=...` passes your API key at runtime.
+- `howmany` is the image to run.
+
+### 3. Or use Docker Compose
+
+```bash
+docker compose up --build
+```
+
+Compose reads `compose.yaml`, builds the image if needed, maps port `5050`, and
+passes `OPENAI_API_KEY` from your shell.
+
+To run it in the background:
+
+```bash
+docker compose up --build -d
+```
+
+To view logs:
+
+```bash
+docker compose logs -f
+```
+
+To stop it:
+
+```bash
+docker compose down
+```
+
 ### 4. Open the frontend
 
-Open `index.html` in your browser directly (double-click or drag into browser).
-Make sure the "Server URL" field in the app points to `http://localhost:5050`.
+Visit `http://localhost:5050` in your browser. If running on EC2, use:
+
+```text
+http://YOUR_EC2_PUBLIC_IP:5050
+```
+
+Make sure your EC2 security group allows inbound TCP traffic on port `5050`, or
+put the app behind a reverse proxy on ports `80`/`443` for a more production-like
+deployment.
 
 ---
 
 ## Usage
 
-1. Upload a schematic PDF (multi-page supported).
-2. Type (or click a suggestion pill for) the item to count — e.g. *street trees*, *bollards*.
-3. Pick a render quality (higher = better accuracy, slower).
-4. Click **Analyse schematic**.
+1. Upload a legend/key PDF that lists symbol codes and descriptions.
+2. Upload one or more schematic PDFs.
+3. Pick a render quality. Higher DPI usually improves accuracy but increases
+   latency and cost.
+4. Click **Count all legend items**.
 
 The server will:
-- Convert each PDF page to a PNG at the chosen DPI.
-- Send each image to `claude-opus-4-5` with a structured prompt.
-- Parse the JSON response and aggregate counts across all pages.
 
-Results show the total count, per-page breakdowns, confidence level, and Claude's reasoning.
+- Convert the legend and schematic PDFs to PNG images.
+- Ask the model to extract all legend items as `{code, description}` pairs.
+- Split each schematic page into a `3x3` tile grid.
+- Count each legend item in each tile.
+- Merge tile-local coordinates back into full-page coordinates.
+- Generate an annotated PDF for each item with confirmed and possible matches.
+
+Results show the number of legend items, total confirmed matches, total possible
+matches, per-item confidence, and a button to open each annotated PDF.
 
 ---
 
@@ -76,37 +194,49 @@ Results show the total count, per-page breakdowns, confidence level, and Claude'
 Returns server status.
 
 ```json
-{ "status": "ok", "api_key_set": true, "pdf2image": true, "pdfium": false }
+{
+  "status": "ok",
+  "api_key_set": true,
+  "pdf2image": true,
+  "pdfium": true,
+  "tile_grid": "3x3"
+}
 ```
 
 ### `POST /count`
 
 **Form data:**
-| Field | Type   | Required | Default | Description                      |
-|-------|--------|----------|---------|----------------------------------|
-| file  | file   | ✓        | —       | PDF file                         |
-| item  | string | ✓        | —       | Natural-language item description|
-| dpi   | int    | —        | 150     | Render resolution                |
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `legend` | file | Yes | - | Legend/key PDF |
+| `files[]` | file[] | Yes | - | One or more schematic PDFs |
+| `dpi` | int | No | `200` | Render resolution |
 
 **Response:**
+
 ```json
 {
-  "total_count": 14,
-  "item": "street trees",
-  "pages": [
+  "legend_items": [
+    { "code": "EL-01", "description": "String Lighting" }
+  ],
+  "results_by_item": [
     {
-      "page": 1,
-      "count": 9,
-      "confidence": "high",
-      "reasoning": "Nine tree symbols (circles with cross) distributed along...",
-      "notes": ""
-    },
-    {
-      "page": 2,
-      "count": 5,
-      "confidence": "medium",
-      "reasoning": "Five planting symbols in the east courtyard...",
-      "notes": "Two symbols are partially obscured by dimension lines."
+      "code": "EL-01",
+      "description": "String Lighting",
+      "total": 14,
+      "maybe": 2,
+      "annotated_pdf": "base64-encoded-pdf",
+      "pages": [
+        {
+          "page": 1,
+          "count": 9,
+          "maybe": 1,
+          "confidence": "medium",
+          "reasoning": "Tile-level reasoning summary.",
+          "notes": ""
+        }
+      ]
     }
   ]
 }
@@ -114,19 +244,73 @@ Returns server status.
 
 ---
 
-## Tips for best results
+## Tips for Best Results
 
-- **Use 200+ DPI** for dense or complex schematics.
-- Be specific: *"deciduous street trees (round canopy symbol)"* is better than just *"trees"*.
-- If counts seem off, describe the symbol used in the drawing.
-- For very large drawings, crop to the relevant area before exporting to PDF.
+- Use 200+ DPI for dense or complex schematics.
+- Use a clear legend/key page with visible symbol codes and descriptions.
+- Remove unrelated legend pages if the model extracts too many non-countable
+  entries.
+- For very large drawings, crop or split to the relevant sheets before upload.
+- Review the annotated PDFs rather than trusting totals blindly; coordinates and
+  confidence are meant to make spot-checking easier.
 
 ---
 
-## Environment variables
+## Environment Variables
 
-| Variable          | Default     | Description              |
-|-------------------|-------------|--------------------------|
-| `ANTHROPIC_API_KEY` | (required) | Your Anthropic API key   |
-| `PORT`            | `5050`      | Server port              |
-| `DEBUG`           | `1`         | Flask debug mode (0/1)   |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `OPENAI_API_KEY` | required | OpenAI API key |
+| `PORT` | `5050` | Server port |
+| `DEBUG` | `0` | Flask debug mode (`0` or `1`) |
+
+Do not commit real API keys. Use shell exports, EC2 environment configuration,
+Docker Compose `.env` files that stay out of Git, or a secrets manager.
+
+---
+
+## Recommended Next Improvements
+
+### Safety and deployment
+
+- Replace the hard-coded frontend server URL with `http://localhost:5050` or
+  `window.location.origin`.
+- Restrict CORS in hosted deployments instead of allowing every origin.
+- Add upload size, page count, legend item count, and DPI limits before model
+  calls start.
+- Return `400` for invalid `dpi` values and clamp accepted values to known
+  options such as `100`, `150`, `200`, and `300`.
+- For EC2 production use, run the Docker container behind Nginx/Caddy with HTTPS
+  instead of exposing Flask directly to the internet.
+
+### Accuracy
+
+- Add tile overlap so labels near tile boundaries are less likely to be missed.
+- Deduplicate nearby coordinates after tile merging to avoid double-counting
+  boundary detections.
+- Preserve schematic filenames in the backend response so multi-PDF results can
+  be traced back to source files.
+
+### User experience
+
+- Add progress reporting. A full run can require:
+
+  ```text
+  legend items x schematic pages x 9 tile calls
+  ```
+
+  Without progress, long jobs look frozen.
+
+- Show page-level details in the UI, not only the item totals.
+- Offer a single combined report download in addition to one annotated PDF per
+  item.
+
+### Maintainability
+
+- Pin dependency versions in `requirements.txt` once the app is stable.
+- Move inline frontend JavaScript/CSS into separate files if the UI keeps
+  growing.
+- Build result rows with DOM APIs and `textContent` instead of `innerHTML`, since
+  filenames and model-returned descriptions can contain unsafe text.
+- Add a small test suite around PDF rendering, DPI validation, coordinate
+  scaling, and result aggregation.

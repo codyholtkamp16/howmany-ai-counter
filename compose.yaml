@@ -1,0 +1,24 @@
+# Docker Compose is a small wrapper around "docker run".
+# It makes the runtime options explicit and easy to repeat.
+services:
+  howmany:
+    # Build an image from the Dockerfile in this folder.
+    build: .
+
+    # Name the container so logs and restarts are easier to recognize.
+    container_name: howmany
+
+    # Map host port 5050 to container port 5050.
+    # Browser hits localhost:5050, Docker forwards to the Flask app.
+    ports:
+      - "5050:5050"
+
+    # Pass secrets/settings into the container at runtime instead of baking them
+    # into the image. Set OPENAI_API_KEY in your shell or put it in a local .env.
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      PORT: 5050
+      DEBUG: 0
+
+    # Restart after EC2 reboots or if the process exits unexpectedly.
+    restart: unless-stopped

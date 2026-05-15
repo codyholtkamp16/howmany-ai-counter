@@ -1,0 +1,8 @@
+flask
+flask-cors
+openai
+pdf2image
+pillow
+pypdf
+pypdfium2
+reportlab

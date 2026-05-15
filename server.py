@@ -1,8 +1,8 @@
 """
 Schematic Item Counter — Flask Backend
 1. Reads a legend PDF to extract all item codes + descriptions
-2. For each legend item, tiles each schematic page into a 2x2 grid
-   and counts instances in each tile separately (4x API calls per page)
+2. For each legend item, tiles each schematic page into a 3x3 grid
+   and counts instances in each tile separately (9x API calls per page)
    then maps coordinates back to the full page for annotation.
 3. Returns annotated PDFs (one per item) + a summary table.
 
@@ -47,7 +47,7 @@ CORS(app)
 API_KEY = os.environ.get("OPENAI_API_KEY", "")
 MODEL   = "gpt-4o"
 
-# Grid dimensions — 2x2 = 4 tiles per page
+# Grid dimensions - 3x3 = 9 tiles per page
 TILE_COLS = 3
 TILE_ROWS = 3
 

@@ -1,0 +1,15 @@
+# Files listed here are not sent to Docker during build.
+# That keeps builds faster and prevents local-only files from entering the image.
+
+.git
+.DS_Store
+__pycache__/
+*.pyc
+*.pyo
+.env
+*.pdf
+*.png
+*.jpg
+*.jpeg
+*.tif
+*.tiff
